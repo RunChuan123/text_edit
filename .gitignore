@@ -1,4 +1,4 @@
 *.dSYM/
 *.log
 main
-*.txt
+count.txt

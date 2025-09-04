@@ -9,11 +9,11 @@ class Logger{
             static Logger logger("debug.log");
             return logger;
         }
-        template <typename T>
-        void log(const std::string& file,int line,const std::string& func,const T& msg){
+        template <typename... Args>
+        void log(const std::string& file,int line,const std::string& func,Args&&... args){
             ofs << "["
-                << file << ":" <<line << "(" << func << ")]"
-                <<msg << std::endl;
+                << file << ":" <<line << "(" << func << ")]";
+                (ofs << ... << args) << std::endl;
         }
         private:
             std::ofstream ofs;
@@ -30,5 +30,5 @@ class Logger{
             Logger& operator=(const Logger&)=delete;
 };
 
-#define DEBUG(msg) \
-Logger::instance().log(__FILE__,__LINE__,__func__,msg)
+#define DEBUG(...) \
+Logger::instance().log(__FILE__,__LINE__,__func__,__VA_ARGS__)

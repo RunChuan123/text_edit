@@ -33,8 +33,8 @@ int getWindowSize(int*,int*);
 void initEditor();
 
 int getCursorPosition(int *rows,int *cols);
-// 存储一行文本
 
+// 存储一行文本
 typedef struct erow {
     int size;
     char *chars;
@@ -46,7 +46,7 @@ struct editorConfig{
     int screencols;
     struct termios orig_termios;
     int numrows;
-    erow row;
+    erow *row;
 };
 struct editorConfig E;
 
@@ -111,19 +111,24 @@ void enableRawMode(void){
 
 
 
-
+// 获取窗口大小
 int getWindowSize(int* rows,int* cols){
     struct winsize ws;
+    // 如果不能从函数获得，还能通过光标移动的方式探测具体的窗口大小
     if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
         if (write(STDOUT_FILENO, "\x1b[999C\x1b[999B", 12) != 12) return -1;
+        DEBUG("rows:",rows," | cols: ",cols);
         return getCursorPosition(rows,cols);
+        // 可以直接获得大小
     } else{ 
+
         *cols = ws.ws_col;
         *rows = ws.ws_row;
+        DEBUG("rows:",ws.ws_row," | cols: ",ws.ws_col);
         return 0;
     }
 }
-
+// 已经移动完毕光标，获取光标位置
 int getCursorPosition(int *rows,int *cols){
     char buf[32];
     unsigned int i=0;
@@ -251,7 +256,7 @@ void editorDrawRows(struct abuf *ab){
     int y;
     for (y=0;y< E.screenrows;y++){
         if (y >= E.numrows){
-        if (y == E.screenrows /3 *2){
+        if (E.numrows==0 && y == E.screenrows /3 *2){
             char welcome[80];
             int welcomelen = snprintf(welcome,sizeof (welcome),
             "Imagine editor -- version %s",Imagine_VERSION);
@@ -271,15 +276,10 @@ void editorDrawRows(struct abuf *ab){
             abAppend(ab,"~",1);
         }
     }else {
-        int len = E.row.size;
+        int len = E.row[y].size;
         if (len > E.screencols) len = E.screencols;
-        abAppend(ab,E.row.chars,len);
+        abAppend(ab,E.row[y].chars,len);
     }
-
-
-
-
-        
         abAppend(ab,"\x1b[K",3);
         if (y < E.screenrows -1){
             abAppend(ab,"\r\n",2);
@@ -309,6 +309,18 @@ void editorRefreshScreen(){
     abFree(&ab);
 }
 
+
+void editorAppendRow(char *s,size_t len){
+    E.row = (erow *)realloc(E.row,sizeof(erow)*(E.numrows+1));
+    int at = E.numrows;
+    E.row[at].size = len;
+    E.row[at].chars = (char *)malloc(len + 1);
+    memcpy(E.row[at].chars,s,len);
+    E.row[at].chars[len] = '\0';
+    E.numrows++;
+}
+
+
 void editorOpen(char *filename){
     FILE *fp = fopen(filename,"r");
     if (!fp) die("fopen");
@@ -316,24 +328,23 @@ void editorOpen(char *filename){
     char * line = NULL;
     size_t linecap =0 ;
     ssize_t linelen;
-    linelen = getline(&line,&linecap,fp);
-    if(linelen != -1){
+    
+    while ((linelen =getline(&line,&linecap,fp)) != -1){
         while(linelen > 0 && (line[linelen-1] == '\n' || line[linelen-1] == '\r')) linelen--;
-        E.row.size = linelen;
-        E.row.chars = (char *)malloc(linelen + 1);
-        memcpy(E.row.chars,line,linelen);
-        E.row.chars[linelen] = '\0';
-        E.numrows = 1;
+        editorAppendRow(line,linelen);
     }
     free(line);
     fclose(fp);
 }
 
 
+
+
 void initEditor(){
     E.cx=0;
     E.cy=0;
     E.numrows =0;
+    E.row = NULL;
     if (getWindowSize(&E.screenrows,&E.screencols) == -1) die("getWindowSize");
 }
 

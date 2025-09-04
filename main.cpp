@@ -42,6 +42,7 @@ typedef struct erow {
 
 struct editorConfig{
     int cx,cy;
+    int rowoff,coloff;
     int screenrows;
     int screencols;
     struct termios orig_termios;
@@ -59,6 +60,8 @@ struct abuf{
     int len;
 };
 #define ABUF_INIT {NULL,0}
+
+// 添加文本
 void abAppend(struct abuf *ab,const char *s, int len){
     char *new_ = (char*)realloc(ab->b,ab->len+len);
     if (new_ == NULL) return;
@@ -102,7 +105,7 @@ void enableRawMode(void){
     // read返回前需要的最小字节数
     raw.c_cc[VMIN] = 0;
     // read返回之前等待的最大时间
-    raw.c_cc[VTIME] = 10;
+    raw.c_cc[VTIME] = 1;
 
 
 
@@ -157,10 +160,11 @@ void editorMoveCursor(int key){
             if (E.cx != 0)E.cx--;
             break;
         case ARROW_DOWN:
-            if (E.cy != E.screenrows-1)E.cy++;
+            if (E.cy < E.numrows)E.cy++;
             break;
         case ARROW_RIGHT:
-            if (E.cx != E.screencols-1)E.cx++;
+            // if (E.cx != E.screencols-1)
+            E.cx++;
             break;
         case ARROW_UP:
             if (E.cy != 0)E.cy--;
@@ -251,34 +255,55 @@ void editorProcessKeypress(){
 
 /*** output ***/
 
+void editorScroll(){
+    if (E.cy < E.rowoff){
+        E.rowoff = E.cy;
+    }
+    if (E.cy >= E.rowoff + E.screenrows){
+        E.rowoff = E.cy - E.screenrows +1;
+    }
+    if (E.cx < E.coloff){
+        E.coloff = E.cx;
+    }
+    if (E.cx >= E.coloff + E.screencols){
+        E.coloff = E.cx - E.screencols +1;
+    } 
+}
+
 
 void editorDrawRows(struct abuf *ab){
     int y;
+    // 显示文本
     for (y=0;y< E.screenrows;y++){
-        if (y >= E.numrows){
-        if (E.numrows==0 && y == E.screenrows /3 *2){
-            char welcome[80];
-            int welcomelen = snprintf(welcome,sizeof (welcome),
-            "Imagine editor -- version %s",Imagine_VERSION);
-            if (welcomelen > E.screencols) welcomelen = E.screencols;
-            int padding = (E.screencols - welcomelen) /2;
-            if (padding){
+        int filerow = y + E.rowoff;
+        
+        // 上侧文本，下侧信息
+        if (filerow >= E.numrows){
+            // 相关信息，不涉及文本
+            if (E.numrows==0 && y == E.screenrows /3 *2){
+                char welcome[80];
+                int welcomelen = snprintf(welcome,sizeof (welcome),
+                "Imagine editor -- version %s",Imagine_VERSION);
+                if (welcomelen > E.screencols) welcomelen = E.screencols;
+                int padding = (E.screencols - welcomelen) /2;
+                if (padding){
+                    abAppend(ab,"~",1);
+                    padding -=1;
+                }
+                while (padding--)
+                {
+                    abAppend(ab," ",1);
+                }
+                
+                abAppend(ab,welcome ,welcomelen);
+            }else {
                 abAppend(ab,"~",1);
-                padding -=1;
             }
-            while (padding--)
-            {
-                abAppend(ab," ",1);
-            }
-            
-            abAppend(ab,welcome ,welcomelen);
-        }else {
-            abAppend(ab,"~",1);
-        }
     }else {
-        int len = E.row[y].size;
+        int len = E.row[filerow].size - E.coloff;
+        if (len < 0) len=0;
         if (len > E.screencols) len = E.screencols;
-        abAppend(ab,E.row[y].chars,len);
+        abAppend(ab,&E.row[filerow].chars[E.coloff],len);
     }
         abAppend(ab,"\x1b[K",3);
         if (y < E.screenrows -1){
@@ -290,6 +315,8 @@ void editorDrawRows(struct abuf *ab){
 
 
 void editorRefreshScreen(){
+    editorScroll();
+
     struct abuf ab = ABUF_INIT;
 
     abAppend(&ab,"\x1b[?25l",6);
@@ -300,7 +327,7 @@ void editorRefreshScreen(){
     editorDrawRows(&ab);
     char buf[32];
     // 光标索引是从1开始，但是不加1好像也没问题
-    snprintf(buf,sizeof(buf),"\x1b[%d;%dH",E.cy+1,E.cx+1);
+    snprintf(buf,sizeof(buf),"\x1b[%d;%dH",(E.cy - E.rowoff)+1,(E.cx-E.coloff)+1);
     abAppend(&ab,buf,strlen(buf));
 
     abAppend(&ab,"\x1b[?25h",6);
@@ -340,11 +367,14 @@ void editorOpen(char *filename){
 
 
 
+
+
 void initEditor(){
     E.cx=0;
     E.cy=0;
     E.numrows =0;
     E.row = NULL;
+    E.rowoff=E.coloff=0;
     if (getWindowSize(&E.screenrows,&E.screencols) == -1) die("getWindowSize");
 }
 

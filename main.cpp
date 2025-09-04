@@ -4,9 +4,12 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
+#include <sys/types.h>
 #include <errno.h>
 #include <string.h>
+#include "debug_logger.hpp"
 
+// #include <fstream>
 #define CTRL_KEY(k) ((k) & 0x1f)
 #define Imagine_VERSION "0.0.1"
 enum editorKey{
@@ -16,8 +19,8 @@ enum editorKey{
     ARROW_UP  ,
     PAGE_UP,
     PAGE_DOWN,
-    HOME,
-    END
+    HOME_KEY,
+    END_KEY
 };
 void die(const char*);
 void disableRawMode();
@@ -30,14 +33,26 @@ int getWindowSize(int*,int*);
 void initEditor();
 
 int getCursorPosition(int *rows,int *cols);
+// 存储一行文本
+
+typedef struct erow {
+    int size;
+    char *chars;
+}erow;
 
 struct editorConfig{
     int cx,cy;
     int screenrows;
     int screencols;
     struct termios orig_termios;
+    int numrows;
+    erow row;
 };
 struct editorConfig E;
+
+
+
+
 
 struct abuf{
     char *b;
@@ -45,10 +60,10 @@ struct abuf{
 };
 #define ABUF_INIT {NULL,0}
 void abAppend(struct abuf *ab,const char *s, int len){
-    char *new = realloc(ab->b,ab->len+len);
-    if (new == NULL) return;
-    memcpy(&new[ab->len],s,len);
-    ab->b=new;
+    char *new_ = (char*)realloc(ab->b,ab->len+len);
+    if (new_ == NULL) return;
+    memcpy(&new_[ab->len],s,len);
+    ab->b=new_;
     ab->len +=len;
 }
 
@@ -88,6 +103,9 @@ void enableRawMode(void){
     raw.c_cc[VMIN] = 0;
     // read返回之前等待的最大时间
     raw.c_cc[VTIME] = 10;
+
+
+
     if(tcsetattr(STDIN_FILENO,TCSAFLUSH,&raw)==-1)die("tcsetattr");
 }
 
@@ -122,18 +140,6 @@ int getCursorPosition(int *rows,int *cols){
     if (buf[0] != '\x1b' || buf[1] != '[') return -1;
     if (sscanf(&buf[2],"%d;%d" , rows,cols))
 
-     
-
-    // printf("\n");
-    // char c;
-    // while(read(STDIN_FILENO,&c,1) ==1 ){
-    //     if(iscntrl(c)){
-    //         printf("%d\r\n",c);
-    //     }else {
-    //         printf("%d (%c)\r\n",c,c);
-    //     }
-    // }
-    // editorReadKey();
     return 0;
 }
 
@@ -163,25 +169,32 @@ int editorReadKey(){
     while ((nread = read(STDIN_FILENO,&c,1)) != 1){
         if (nread == -1 && errno != EAGAIN) die("read");
     }
-
+    DEBUG(c);
     if (c == '\x1b') {
         char seq[3];
         if (read(STDIN_FILENO,&seq[0],1) != 1)return '\x1b';
         if (read(STDIN_FILENO,&seq[1],1) != 1)return '\x1b';
 
         if (seq[0] == '['){
+            DEBUG(seq);
             if (seq[1] >= '0' && seq[1] <= '9'){
+                DEBUG("step in cntrl");
                 if (read(STDIN_FILENO,&seq[2],1) != 1) return '\x1b';
                 if (seq[2] == '~'){
+                    
                     switch (seq[1])
                     {
-                    case 5:
+                    
+                    case '5':
+                        DEBUG("tap page_up");
                         return PAGE_UP;
-                    case 6:
+                    case '6':
+                        DEBUG("tap page_down");
                         return PAGE_DOWN;
                     }
                 }
             } else {
+                DEBUG("step in arrow");
             switch (seq[1])
             {
             case 'A': return ARROW_UP;
@@ -237,6 +250,7 @@ void editorProcessKeypress(){
 void editorDrawRows(struct abuf *ab){
     int y;
     for (y=0;y< E.screenrows;y++){
+        if (y >= E.numrows){
         if (y == E.screenrows /3 *2){
             char welcome[80];
             int welcomelen = snprintf(welcome,sizeof (welcome),
@@ -256,6 +270,11 @@ void editorDrawRows(struct abuf *ab){
         }else {
             abAppend(ab,"~",1);
         }
+    }else {
+        int len = E.row.size;
+        if (len > E.screencols) len = E.screencols;
+        abAppend(ab,E.row.chars,len);
+    }
 
 
 
@@ -288,20 +307,42 @@ void editorRefreshScreen(){
 
     write(STDOUT_FILENO,ab.b,ab.len);
     abFree(&ab);
+}
 
+void editorOpen(char *filename){
+    FILE *fp = fopen(filename,"r");
+    if (!fp) die("fopen");
 
+    char * line = NULL;
+    size_t linecap =0 ;
+    ssize_t linelen;
+    linelen = getline(&line,&linecap,fp);
+    if(linelen != -1){
+        while(linelen > 0 && (line[linelen-1] == '\n' || line[linelen-1] == '\r')) linelen--;
+        E.row.size = linelen;
+        E.row.chars = (char *)malloc(linelen + 1);
+        memcpy(E.row.chars,line,linelen);
+        E.row.chars[linelen] = '\0';
+        E.numrows = 1;
+    }
+    free(line);
+    fclose(fp);
 }
 
 
 void initEditor(){
     E.cx=0;
     E.cy=0;
+    E.numrows =0;
     if (getWindowSize(&E.screenrows,&E.screencols) == -1) die("getWindowSize");
 }
 
-int main(void){
+int main(int argc,char *argv[]){
     enableRawMode();
     initEditor();
+    if (argc >= 2){
+        editorOpen(argv[1]);
+    }
     while (1){
         editorRefreshScreen();
         editorProcessKeypress();

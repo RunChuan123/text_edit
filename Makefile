@@ -1,5 +1,5 @@
 CXX := clang++
-CXXFLAGS := -std=c++11 -Wall -Wextra -pedantic -g -O0
+CXXFLAGS := -std=c++17 -Wall -Wextra  -pedantic -g -O0
 CPPFLAGS := -DDEBUG
 
 TARGET := main

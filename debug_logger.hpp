@@ -30,5 +30,5 @@ class Logger{
             Logger& operator=(const Logger&)=delete;
 };
 
-#define DEBUG(...) \
+#define DEBUG_LOG(...) \
 Logger::instance().log(__FILE__,__LINE__,__func__,__VA_ARGS__)

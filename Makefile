@@ -15,3 +15,6 @@ run: $(TARGET)
 	./$(TARGET)
 clean:
 	rm -f $(TARGET)
+
+# test: test.cpp
+# 	clang++ test.cpp -o test && ./test 

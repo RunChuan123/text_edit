@@ -1,6 +1,0 @@
-*.dSYM/
-*.log
-main
-count.txt
-test*
-.vscode/*

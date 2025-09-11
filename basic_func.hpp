@@ -3,14 +3,12 @@
 void die(const char*);
 void disableRawMode();
 void enableRawMode(void);
-int editorReadKey();
-void editorProcessKeypress();
-
-
+void editorAppendRow(char *s,size_t len);
+void editorUpdateRow(erow * row);
 int getWindowSize(int*,int*);
 void initEditor();
 void editorDrawRows(struct abuf *);
-
+void editorMoveCursor(int key);
 void editorOpen(char *filename);
 void editorSetStatusMessage(const char* fmt,...);
 

@@ -4,9 +4,12 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <sys/ioctl.h>
+#include <time.h>
+#include <stdarg.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <string.h> 
+
 #include "debug_logger.hpp"
 
 // #include <fstream>
@@ -57,6 +60,8 @@ struct editorConfig{
     int numrows;
     erow *row;
     char* filename;
+    char statusmsg[80];
+    time_t statusmsg_time;
 };
 struct editorConfig E;
 
@@ -326,7 +331,26 @@ void editorDrawStatusBar(abuf *ab){
         }
     }
     abAppend(ab,"\x1b[m",3);
+    abAppend(ab,"\r\n",2);
 }
+
+// 第二行状态信息
+void editorSetStatusMessage(const char* fmt,...){
+    va_list ap;
+    va_start(ap,fmt);
+    vsnprintf(E.statusmsg,sizeof(E.statusmsg),fmt,ap);
+    va_end(ap);
+    E.statusmsg_time = time(NULL);
+}
+
+void editorDrawMessagBar(abuf *ab){
+    abAppend(ab,"\x1b[K",3);
+    int msglen = strlen(E.statusmsg);
+    if (msglen > E.screencols) msglen=E.screencols;
+    if(msglen && time(NULL) - E.statusmsg_time < 5)
+        abAppend(ab,E.statusmsg,msglen);
+}
+
 
 void editorDrawRows(struct abuf *ab){
     int y;
@@ -383,6 +407,7 @@ void editorRefreshScreen(){
     abAppend(&ab,"\x1b[H",3);
     editorDrawRows(&ab);
     editorDrawStatusBar(&ab);
+    editorDrawMessagBar(&ab);
     char buf[32];
     // 光标索引是从1开始，但是不加1好像也没问题
     snprintf(buf,sizeof(buf),"\x1b[%d;%dH",(E.cy - E.rowoff)+1,
@@ -480,9 +505,12 @@ void initEditor(){
     E.row = NULL;
     E.filename = NULL;
     E.rowoff=E.coloff=0;
+    E.statusmsg[0] = '\0';
+    E.statusmsg_time=0;
     if (getWindowSize(&E.screenrows,&E.screencols) == -1) die("getWindowSize");
-    E.screenrows -=1;
-    printf("rows=%d cols=%d\n", E.screenrows, E.screencols);
+    E.screenrows -=2;
+    
+    // printf("rows=%d cols=%d\n", E.screenrows, E.screencols);
 }
 
 int main(int argc,char *argv[]){
@@ -491,6 +519,7 @@ int main(int argc,char *argv[]){
     if (argc >= 2){
         editorOpen(argv[1]);
     }
+    editorSetStatusMessage("HELP: Control-Q = quit");
     DEBUG_LOG("main");
     while (1){
         editorRefreshScreen();

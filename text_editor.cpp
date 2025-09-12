@@ -15,6 +15,7 @@
 
 
 
+
 void editorRowInsertChar(erow *row,int at, int c){
     if(at < 0 || at > row->size) at = row->size;
     row->chars = (char *)realloc(row->chars,row->size +2);
@@ -25,7 +26,7 @@ void editorRowInsertChar(erow *row,int at, int c){
 }
 void editorInsertChar(int c){
     if(E.cy == E.numrows){
-        editorAppendRow("",0);
+        editorAppendRow(strdup(""),0);
     }
     editorRowInsertChar(&E.row[E.cy],E.cx,c);
     E.cx++;

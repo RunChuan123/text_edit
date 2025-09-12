@@ -14,7 +14,8 @@
 #include "debug_logger.hpp"
 #include "basic_func.hpp"
 #include "config.hpp"
-
+#include "text_editor.hpp"
+#include "file_op.hpp"
 
 int editorReadKey(){
     DEBUG_LOG("in editorReadKey");
@@ -79,9 +80,19 @@ void editorProcessKeypress(){
     // DEBUG_LOG("this");
     switch (c)
     {
+    case '\r':
+        break;
     case CTRL_KEY('q'): 
         editorRefreshScreen();
         exit(0);
+        break;
+    case CTRL_KEY('s'):
+        editorSave();
+        break;
+    case BACKSPACE:
+    case CTRL_KEY('h'):
+    case DEL_KEY:
+        
         break;
     case PAGE_UP:
     case PAGE_DOWN:
@@ -97,8 +108,12 @@ void editorProcessKeypress(){
     case ARROW_LEFT:
         editorMoveCursor(c);
         break;
-    
+    case CTRL_KEY('l'):
+    case '\x1b':
+
+        break;
     default:
+        editorInsertChar(c);
         break;
     }
 }

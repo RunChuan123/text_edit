@@ -3,7 +3,7 @@ CXXFLAGS := -std=c++17 -Wall -Wextra  -pedantic -g -O0
 CPPFLAGS := -DDEBUG
 
 TARGET := main
-SRC := main.cpp basic_func.cpp text_editor.cpp
+SRC := main.cpp basic_func.cpp text_editor.cpp process_key.cpp file_op.cpp
 
 .PHONY: all run clean
 

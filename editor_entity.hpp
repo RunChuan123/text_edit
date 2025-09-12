@@ -16,6 +16,7 @@
 
 
 enum editorKey{
+    BACKSPACE = 127,
     ARROW_LEFT =1000,
     ARROW_DOWN ,
     ARROW_RIGHT ,
@@ -23,7 +24,8 @@ enum editorKey{
     PAGE_UP,
     PAGE_DOWN,
     HOME_KEY,
-    END_KEY
+    END_KEY,
+    DEL_KEY
 };
 
 struct erow {

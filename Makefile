@@ -1,12 +1,11 @@
 CXX := clang++
 CXXFLAGS := -std=c++17 -Wall -Wextra  -pedantic -g -O0
 CPPFLAGS := -DDEBUG
-
 TARGET := main
-SRC := main.cpp basic_func.cpp text_editor.cpp process_key.cpp file_op.cpp
-
+SRC := main.cpp window_op.cpp text_editor.cpp process_key.cpp file_op.cpp status.cpp
+ 
 .PHONY: all run clean
-
+     
 all: $(TARGET)
 
 $(TARGET): $(SRC)
@@ -16,3 +15,5 @@ run: $(TARGET)
 clean:
 	rm -f $(TARGET)
 
+row: row_key_show
+	clang++ row_key_show.cpp -o row && ./row

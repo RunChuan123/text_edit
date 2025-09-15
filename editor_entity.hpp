@@ -36,13 +36,6 @@ struct erow {
     char *render;
 };
 
-
-struct abuf{
-    char *b;
-    int len;
-};
-
-
 struct editorConfig{
     int rx;
     int cx,cy;
@@ -55,6 +48,11 @@ struct editorConfig{
     char* filename;
     char statusmsg[80];
     time_t statusmsg_time;
+    int dirty;
 };
 extern editorConfig E;
 
+struct abuf{
+    char *b;
+    int len;
+};

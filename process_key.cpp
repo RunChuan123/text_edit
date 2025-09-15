@@ -12,11 +12,11 @@
 #include <string.h> 
 #include "editor_entity.hpp"
 #include "debug_logger.hpp"
-#include "basic_func.hpp"
+#include "window_op.hpp"
 #include "config.hpp"
 #include "text_editor.hpp"
 #include "file_op.hpp"
-
+#include "status.hpp"
 int editorReadKey(){
     DEBUG_LOG("in editorReadKey");
     int nread;
@@ -25,11 +25,6 @@ int editorReadKey(){
         if (nread == -1 && errno != EAGAIN) die("read");
     }
     DEBUG_LOG("keycode:", c);
-    // nread = read(STDIN_FILENO,&c,1);
-    // DEBUG_LOG("editorReadKey", nread);
-    // if (nread == 1) return c;
-    // return -1;  // 没输入
-    // DEBUG_LOG("editorReadKey return -1");
     if (c == '\x1b') {
         char seq[3];
         if (read(STDIN_FILENO,&seq[0],1) != 1)return '\x1b';
@@ -44,7 +39,9 @@ int editorReadKey(){
                     
                     switch (seq[1])
                     {
-                    
+                    case '3':
+                        DEBUG_LOG("delkey");
+                        return DEL_KEY;
                     case '5':
                         DEBUG_LOG("tap page_up");
                         return PAGE_UP;
@@ -74,6 +71,7 @@ int editorReadKey(){
 
 
 void editorProcessKeypress(){
+    static int quit_times = QUIT_TIMES;
     // DEBUG_LOG("enter editorProcessKeypress");
     int c = editorReadKey();
     // if (c == -1) return;
@@ -83,7 +81,16 @@ void editorProcessKeypress(){
     case '\r':
         break;
     case CTRL_KEY('q'): 
-        editorRefreshScreen();
+        if(E.dirty && quit_times > 0){
+            editorSetStatusMessage("File has unsaved changes. "
+            "Press Ctrl-Q %d more times to quit.", quit_times);
+            quit_times--;
+            return;
+        }
+        
+        // editorRefreshScreen();
+        write(STDOUT_FILENO, "\x1b[2J", 4);
+        write(STDOUT_FILENO, "\x1b[H", 3);
         exit(0);
         break;
     case CTRL_KEY('s'):
@@ -92,6 +99,22 @@ void editorProcessKeypress(){
     case BACKSPACE:
     case CTRL_KEY('h'):
     case DEL_KEY:
+        editorMoveCursor(ARROW_RIGHT);
+        editorDelChar();
+        break;
+    
+        // if(E.cx != 0){
+        //     E.cx --;
+        //     memmove(&E.row[E.cy].chars[E.cx],&E.row[E.cy].chars[E.cx+1],E.row[E.cy].size-E.cx);
+        //     E.row[E.cy].size--;
+        //     editorUpdateRow(&E.row[E.cy]);
+        // } else {
+        //     // 需要改，暂时先这样
+        //     if(E.cy>0){
+        //         // editorDelRow();
+                
+        //     }
+        // }
         
         break;
     case PAGE_UP:
@@ -116,4 +139,5 @@ void editorProcessKeypress(){
         editorInsertChar(c);
         break;
     }
+    quit_times = QUIT_TIMES;
 }

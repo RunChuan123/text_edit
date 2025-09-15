@@ -14,6 +14,8 @@
 #include "debug_logger.hpp"
 #include "process_key.hpp"
 #include "config.hpp"
+#include "window_op.hpp"
+#include "status.hpp"
 
 char *editorRowsToString(int *buflen){
     int totlen=0;
@@ -37,8 +39,37 @@ void editorSave(){
     int len;
     char *buf = editorRowsToString(&len);
     int fd = open(E.filename,O_RDWR | O_CREAT,0644);
-    ftruncate(fd,len);
-    write(fd,buf,len);
-    close(fd);
+    if(fd != -1){
+        if(ftruncate(fd,len) != -1){
+            if(write(fd,buf,len)==len){
+                close(fd);
+                free(buf);
+                E.dirty = 0;
+                editorSetStatusMessage("%d bytes written to disk",len);
+                return;
+            }
+        }
+        close(fd);
+    }
     free(buf);
+    editorSetStatusMessage("Can`t save file! I/O error: %s",strerror(errno));
+}
+
+void editorOpen(char *filename){
+    free(E.filename);
+    E.filename = strdup(filename);
+    FILE *fp = fopen(E.filename,"r");
+    if (!fp) die("fopen");
+
+    char * line = NULL;
+    size_t linecap =0 ;
+    ssize_t linelen;
+    
+    while ((linelen =getline(&line,&linecap,fp)) != -1){
+        while(linelen > 0 && (line[linelen-1] == '\n' || line[linelen-1] == '\r')) linelen--;
+        editorAppendRow(line,linelen);
+    }
+    free(line);
+    fclose(fp);
+    E.dirty = 0;
 }

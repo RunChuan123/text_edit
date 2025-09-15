@@ -6,6 +6,7 @@
 #include <sys/ioctl.h>
 #include <time.h>
 #include <stdarg.h>
+#include <signal.h>
 #include <sys/types.h>
 #include <errno.h>
 #include <string.h> 
@@ -13,6 +14,7 @@
 #include "debug_logger.hpp"
 #include "process_key.hpp"
 #include "config.hpp"
+#include "status.hpp"
 
 
 void editorRefreshScreen();
@@ -44,9 +46,18 @@ void disableRawMode(){
     if (tcsetattr(STDIN_FILENO,TCSAFLUSH,&E.orig_termios) == -1)die("tcsetattr");
 }
 
+void handleSignal(int sig){
+    std::cerr<< sig<<std::endl;
+    disableRawMode();
+    exit(1);
+}
+
 void enableRawMode(void){
     
     if(tcgetattr(STDIN_FILENO,&E.orig_termios)==-1)die("tcgetattr");
+    signal(SIGINT,handleSignal);
+    signal(SIGTERM,handleSignal);
+    signal(SIGSEGV,handleSignal);
 
     atexit(disableRawMode);
     struct termios raw = E.orig_termios;
@@ -168,45 +179,7 @@ void editorScroll(){
     } 
     DEBUG_LOG("end editorScroll");
 }
- 
-void editorDrawStatusBar(abuf *ab){
-    abAppend(ab,"\x1b[7m",4);
-    char status[80],rstatus[80];
 
-    int len=snprintf(status,sizeof(status),"%.20s - %d lines",E.filename?E.filename:"[Not open any file]",E.numrows);
-    int rlen = snprintf(rstatus, sizeof(rstatus), "%d/%d",E.cy + 1, E.numrows);
-
-    if(len > E.screencols) len = E.screencols;
-    abAppend(ab,status,len);
-    while(len<E.screencols){
-        if (E.screencols -len == rlen){
-            abAppend(ab,rstatus,rlen);
-            break;
-        }else{
-            abAppend(ab, " ",1);
-            len++;
-        }
-    }
-    abAppend(ab,"\x1b[m",3);
-    abAppend(ab,"\r\n",2);
-}
-
-// 第二行状态信息
-void editorSetStatusMessage(const char* fmt,...){
-    va_list ap;
-    va_start(ap,fmt);
-    vsnprintf(E.statusmsg,sizeof(E.statusmsg),fmt,ap);
-    va_end(ap);
-    E.statusmsg_time = time(NULL);
-}
-
-void editorDrawMessagBar(abuf *ab){
-    abAppend(ab,"\x1b[K",3);
-    int msglen = strlen(E.statusmsg);
-    if (msglen > E.screencols) msglen=E.screencols;
-    if(msglen && time(NULL) - E.statusmsg_time < 5)
-        abAppend(ab,E.statusmsg,msglen);
-}
 
 
 void editorDrawRows(struct abuf *ab){
@@ -254,7 +227,7 @@ void editorDrawRows(struct abuf *ab){
 
 void editorRefreshScreen(){
     editorScroll();
-    DEBUG_LOG("editorRefreshScreen");
+    // DEBUG_LOG("editorRefreshScreen");
     struct abuf ab = ABUF_INIT;
 
     abAppend(&ab,"\x1b[?25l",6);
@@ -326,31 +299,9 @@ void editorAppendRow(char *s,size_t len){
     
     editorUpdateRow(&E.row[at]);
     E.numrows++;
+    E.dirty++;
 
 }
-
-
-void editorOpen(char *filename){
-    free(E.filename);
-    E.filename = strdup(filename);
-    FILE *fp = fopen(E.filename,"r");
-    if (!fp) die("fopen");
-
-    char * line = NULL;
-    size_t linecap =0 ;
-    ssize_t linelen;
-    
-    while ((linelen =getline(&line,&linecap,fp)) != -1){
-        while(linelen > 0 && (line[linelen-1] == '\n' || line[linelen-1] == '\r')) linelen--;
-        editorAppendRow(line,linelen);
-    }
-    free(line);
-    fclose(fp);
-}
-
-
-
-
 
 
 
@@ -366,6 +317,12 @@ void initEditor(){
     E.statusmsg_time=0;
     if (getWindowSize(&E.screenrows,&E.screencols) == -1) die("getWindowSize");
     E.screenrows -=2;
+    E.dirty = 0;
     
     // printf("rows=%d cols=%d\n", E.screenrows, E.screencols);
 }
+
+
+
+
+

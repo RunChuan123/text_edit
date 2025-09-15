@@ -12,7 +12,7 @@
 #include <iostream>
 
 termios E;
-
+#define CTRL_KEY(k) ((k) & 0x1f)
 void enableRawMode(void){
 
     tcgetattr(STDIN_FILENO,&E);
@@ -26,9 +26,9 @@ void enableRawMode(void){
     // ICANON 字节读入 ISIG 关闭终端信号
     raw.c_lflag &= ~(ECHO | ICANON | ISIG | IEXTEN);
     // read返回前需要的最小字节数
-    raw.c_cc[VMIN] = 0;
+    // raw.c_cc[VMIN] = 1;
     // read返回之前等待的最大时间
-    raw.c_cc[VTIME] = 10;
+    // raw.c_cc[VTIME] = 10;
 
 
 
@@ -41,13 +41,16 @@ void disableRawMode(){
 
 int main(){
     enableRawMode();
-    char nread;
-    while(read(STDIN_FILENO,&nread,1)==1){
-        
-        
-        std::cout << nread << " " << int(nread);
-        if(nread == 'c')break;
+    
+    unsigned char c;
+    while (read(STDIN_FILENO, &c, 1) == 1) {
+        if (iscntrl(c)) {
+            printf("%d\n", c);
+        } else {
+            printf("%d (%c)\n", c, c);
+        }
     }
+
 
 
     disableRawMode();

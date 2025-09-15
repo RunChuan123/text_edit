@@ -9,9 +9,8 @@ int getWindowSize(int*,int*);
 void initEditor();
 void editorDrawRows(struct abuf *);
 void editorMoveCursor(int key);
-void editorOpen(char *filename);
-void editorSetStatusMessage(const char* fmt,...);
 
+void abAppend(struct abuf *ab,const char *s, int len);
 void editorRefreshScreen();
 int getCursorPosition(int *rows,int *cols);
 int editorRowToRx(erow *row,int cx);

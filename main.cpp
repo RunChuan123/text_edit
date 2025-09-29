@@ -6,7 +6,7 @@
 #include "file_op.hpp"
 #include <err.h>
 editorConfig E;
-
+ 
 int main(int argc,char *argv[]){
     
     enableRawMode();
